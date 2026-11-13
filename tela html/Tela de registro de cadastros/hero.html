@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrados</title>
+    <link rel="stylesheet" href="hero.css">
+</head>
+
+<body>
+    <main class="login">
+
+        <section class="login__form">
+            <div class="conteudo">
+                <h1>Meu cadastro<span class="ponto"></span></h1>
+                <p class="contador" id="contador"></p>
+
+                <div class="box-dados" id="listaCadastros"></div>
+
+                <div class="acoes">
+                    <a href="../tela de login/login.html" class="botao botao--voltar">Voltar</a>
+                    <a href="../tela de produtos/cadastro-produto.html" class="botao botao--voltar">Produtos</a>
+                    <button type="button" class="botao botao--limpar" id="btnLimpar">Sair</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="login__imagem">
+            <img src="../tela de login/foto/login.avif" alt="">
+        </section>
+    </main>
+
+    <script>
+        const API_URL = "http://localhost:8080";            // back-end Spring
+        const PAGINA_LOGIN = "../tela de login/login.html";
+
+        const lista = document.getElementById("listaCadastros");
+        const contador = document.getElementById("contador");
+        const btnSair = document.getElementById("btnLimpar");   // mesmo botão, agora "Sair"
+
+        function lerUsuario() {
+            try {
+                return JSON.parse(localStorage.getItem("usuario"));
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function sair() {
+            localStorage.removeItem("usuario");
+            window.location.href = PAGINA_LOGIN;
+        }
+
+        function formatarCep(c) {
+            const d = (c || "").replace(/\D/g, "");
+            return d.length === 8 ? d.slice(0, 5) + "-" + d.slice(5) : c;
+        }
+
+        function formatarTelefone(t) {
+            const d = (t || "").replace(/\D/g, "");
+            if (d.length === 11) return "(" + d.slice(0, 2) + ") " + d.slice(2, 7) + "-" + d.slice(7);
+            if (d.length === 10) return "(" + d.slice(0, 2) + ") " + d.slice(2, 6) + "-" + d.slice(6);
+            return t;
+        }
+
+        function criarDetalhe(rotulo, valor) {
+            const item = document.createElement("div");
+            item.className = "detalhe";
+
+            const r = document.createElement("span");
+            r.className = "detalhe__rotulo";
+            r.textContent = rotulo;
+
+            const v = document.createElement("span");
+            v.className = "detalhe__valor";
+            v.textContent = valor || "—";
+
+            item.appendChild(r);
+            item.appendChild(v);
+            return item;
+        }
+
+        function mostrarMensagem(texto) {
+            lista.innerHTML = "";
+            const p = document.createElement("p");
+            p.className = "vazio";
+            p.textContent = texto;
+            lista.appendChild(p);
+        }
+
+        function desenhar(c) {
+            lista.innerHTML = "";
+            contador.textContent = "Você está logado como " + c.email;
+
+            const card = document.createElement("div");
+            card.className = "cadastro";
+
+            const topo = document.createElement("div");
+            topo.className = "cadastro__topo";
+
+            const avatar = document.createElement("div");
+            avatar.className = "cadastro__avatar";
+            avatar.textContent = (c.nome || c.email || "?").charAt(0).toUpperCase();
+
+            const info = document.createElement("div");
+            info.className = "cadastro__info";
+
+            const numero = document.createElement("span");
+            numero.className = "cadastro__numero";
+            numero.textContent = "Cadastro #" + c.id;
+
+            const nome = document.createElement("span");
+            nome.className = "cadastro__nome";
+            nome.textContent = c.nome || "Sem nome";
+
+            const email = document.createElement("span");
+            email.className = "cadastro__email";
+            email.textContent = c.email;
+            email.title = c.email;
+
+            const excluir = document.createElement("button");
+            excluir.type = "button";
+            excluir.className = "cadastro__excluir";
+            excluir.textContent = "✕";
+            excluir.title = "Excluir minha conta";
+            excluir.addEventListener("click", async function () {
+                if (!confirm("Excluir sua conta definitivamente?")) return;
+                try {
+                    const resp = await fetch(API_URL + "/usuarios/" + c.id, { method: "DELETE" });
+                    if (!resp.ok) throw new Error();
+                    sair();
+                } catch (e) {
+                    alert("Não foi possível excluir a conta.");
+                }
+            });
+
+            info.appendChild(numero);
+            info.appendChild(nome);
+            info.appendChild(email);
+            topo.appendChild(avatar);
+            topo.appendChild(info);
+            topo.appendChild(excluir);
+
+            const detalhes = document.createElement("div");
+            detalhes.className = "cadastro__detalhes";
+            detalhes.appendChild(criarDetalhe("Endereço", c.endereco));
+            detalhes.appendChild(criarDetalhe("Número", c.numero));
+            detalhes.appendChild(criarDetalhe("CEP", formatarCep(c.cep)));
+            detalhes.appendChild(criarDetalhe("Telefone", formatarTelefone(c.telefone)));
+
+            const obs = criarDetalhe("Observação", c.observacao);
+            obs.classList.add("detalhe--largo");
+            detalhes.appendChild(obs);
+
+            card.appendChild(topo);
+            card.appendChild(detalhes);
+            lista.appendChild(card);
+        }
+
+        async function iniciar() {
+            const logado = lerUsuario();
+            if (!logado || !logado.id) {      // ninguém logado: volta para o login
+                sair();
+                return;
+            }
+
+            desenhar(logado);                  // mostra na hora o que veio do login
+
+            try {                              // e atualiza com os dados do banco
+                const resp = await fetch(API_URL + "/usuarios/" + logado.id);
+                if (resp.status === 404) {
+                    const corpo = await resp.json().catch(function () { return {}; });
+                    if (corpo.erro) sair();   // o usuário realmente não existe mais
+                    return;                   // rota ainda não existe no back-end: mantém os dados do login
+                }
+                if (!resp.ok) throw new Error();
+                const atual = await resp.json();
+                localStorage.setItem("usuario", JSON.stringify(atual));
+                desenhar(atual);
+            } catch (e) {
+                // sem conexão: mantém os dados guardados no login
+            }
+        }
+
+        btnSair.addEventListener("click", sair);
+
+        iniciar();
+    </script>
+</body>
+
+</html>

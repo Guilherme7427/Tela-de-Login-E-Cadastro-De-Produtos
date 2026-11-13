@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <link rel="stylesheet" href="login.css">
+</head>
+
+<body>
+    <main class="login">
+
+        <section class="login__form">
+            <form id="formLogin" action="#" method="post">
+                <h1>Faça seu login<span class="ponto"></span></h1>
+
+                <label for="email">
+                    <h2>E-mail</h2>
+                </label>
+                <div class="campo">
+                    <svg class="icone esquerda" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M2 5h20v2l-10 6L2 7V5zm0 4.5l10 6 10-6V19H2V9.5z" />
+                    </svg>
+                    <input type="email" id="email" name="email" autocomplete="email" required>
+                </div>
+
+                <label for="senha">
+                    <h2>Senha</h2>
+                </label>
+                <div class="campo">
+                    <input type="password" id="senha" name="senha" autocomplete="current-password" required>
+                    <svg class="icone direita" viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                            d="M6 10V8a6 6 0 1112 0v2h1a1 1 0 011 1v10a1 1 0 01-1 1H5a1 1 0 01-1-1V11a1 1 0 011-1h1zm2 0h8V8a4 4 0 10-8 0v2zm4 4a1.5 1.5 0 00-.5 2.9V19h1v-2.1A1.5 1.5 0 0012 14z" />
+                    </svg>
+                </div>
+
+                <a href="#" class="esqueci">
+                    <h4>Esqueci minha senha</h4>
+                </a>
+                <p class="erro" id="erro" role="alert"></p>
+                <a href="../Tela de registro de cadastros/hero.html"><button type="submit" class="botao">Entrar</button></a>
+                
+
+                <!-- troque pelo nome real do arquivo da sua tela de cadastro -->
+                <a href="../tela de cadastro/tela_cadastro.html" class="cadastro">Ainda não tenho uma conta</a>
+            </form>
+        </section>
+
+        <section class="login__imagem">
+            <img src="./foto/login.avif" alt="">
+        </section>
+
+    </main>
+
+    <script>
+        const API_URL = "http://localhost:8080";                          // back-end Spring
+        const PAGINA_INICIAL = "../Tela de registro de cadastros/hero.html";
+
+        const form = document.getElementById("formLogin");
+        const erro = document.getElementById("erro");
+
+        form.addEventListener("submit", async function (e) {
+            e.preventDefault();
+            erro.textContent = "";
+
+            const btn = form.querySelector(".botao");
+            btn.disabled = true;
+
+            try {
+                const resp = await fetch(API_URL + "/usuarios/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        email: document.getElementById("email").value.trim(),
+                        senha: document.getElementById("senha").value
+                    })
+                });
+                const corpo = await resp.json().catch(function () { return {}; });
+
+                if (!resp.ok) {
+                    erro.textContent = corpo.erro || "Não foi possível entrar.";
+                    return;
+                }
+
+                localStorage.setItem("usuario", JSON.stringify(corpo));
+                window.location.href = PAGINA_INICIAL;
+            } catch (err) {
+                erro.textContent = "Não foi possível conectar ao servidor. Verifique se o back-end está rodando.";
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

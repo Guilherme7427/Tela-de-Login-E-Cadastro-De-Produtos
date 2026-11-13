@@ -1,0 +1,161 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    background: #1c2a33;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #e6e6e6;
+}
+
+/* Cartão principal: formulário + imagem lado a lado */
+.login {
+    display: flex;
+    width: 100%;
+    max-width: 1200px;
+    min-height: 92vh;
+    background: #060608;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* ---------- Formulário ---------- */
+.login__form {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+}
+
+form { width: 100%; max-width: 300px; }
+
+h1 {
+    font-size: 2.6rem;
+    text-align: center;
+    margin-bottom: 48px;
+    color: #f0f0f0;
+    text-shadow: 0 0 6px rgba(255, 255, 255, .45);
+    white-space: nowrap;
+}
+
+/* ponto colorido do título */
+.ponto {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-left: 4px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4f5bd5, #d1459b, #f7b267);
+}
+
+/* os <h2> dentro dos labels ficam com cara de label */
+label h2 {
+    font-size: .95rem;
+    font-weight: normal;
+    margin: 0 0 6px 3px;
+}
+
+/* Campo com ícone */
+.campo {
+    position: relative;
+    margin-bottom: 36px;
+}
+
+.campo input {
+    width: 100%;
+    height: 38px;
+    padding: 0 40px 0 12px;
+    background: #161618;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 1rem;
+    outline: none;
+}
+.campo input[type="email"] { padding-left: 42px; }
+.campo input:focus { box-shadow: 0 0 0 2px #d1459b; }
+
+.icone {
+    position: absolute;
+    top: 50%;
+    width: 24px;
+    height: 24px;
+    transform: translateY(-50%);
+    fill: #6f7480;
+    pointer-events: none;
+}
+.icone.esquerda { left: 10px; }
+.icone.direita  { right: 10px; }
+
+/* Links */
+a {
+    color: #7b7f88;
+    font-size: .85rem;
+    text-decoration: underline;
+}
+a:hover { color: #b5b8c0; }
+
+.esqueci {
+    display: block;
+    text-align: right;
+    margin: -10px 6px 32px 0;
+}
+.esqueci h4 { font-size: .85rem; font-weight: normal; }
+
+/* Botão com degradê */
+.botao {
+    display: block;
+    width: 225px;
+    height: 46px;
+    margin: 0 auto 26px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #4f5bd5 0%, #d1459b 55%, #f7b267 100%);
+    color: #fff;
+    font-size: 1.1rem;
+    letter-spacing: .5px;
+    cursor: pointer;
+    transition: filter .2s;
+}
+.botao:hover { filter: brightness(1.15); }
+
+.cadastro { display: block; text-align: center; }
+
+/* ---------- Imagem ---------- */
+.login__imagem {
+    flex: 1;
+    position: relative;
+}
+
+.login__imagem img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* esfumaça a borda esquerda da imagem no preto do formulário */
+.login__imagem::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(90deg, #060608 0%, rgba(6, 6, 8, 0) 45%);
+}
+
+/* Celular: esconde a imagem */
+@media (max-width: 760px) {
+    .login__imagem { display: none; }
+    h1 { font-size: 2rem; }
+}
+.erro {
+    min-height: 1.2em;
+    margin-top: 8px;
+    font-size: .85rem;
+    color: #ff6b81;
+    text-align: center;
+}

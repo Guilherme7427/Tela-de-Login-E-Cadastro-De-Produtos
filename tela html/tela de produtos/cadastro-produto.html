@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cadastro de produtos</title>
+  <link rel="stylesheet" href="cadastro-produto.css">
+</head>
+<body>
+  <main class="app">
+
+    <!-- ===== FORMULÁRIO (Create / Update) ===== -->
+    <section class="painel-form">
+      <h1 id="titulo-form">Novo produto<span class="ponto"></span></h1>
+      <p class="subtitulo" id="subtitulo-form">Preencha e salve: o produto aparece na lista ao lado.</p>
+
+      <form id="form" novalidate>
+        <label for="codigo">Código</label>
+        <input id="codigo" type="text" maxlength="20" placeholder="Ex.: HB-001" autocomplete="off">
+
+        <label for="nome">Nome do produto</label>
+        <input id="nome" type="text" maxlength="60" placeholder="Ex.: X-Burger" autocomplete="off">
+
+        <label for="categoria">Categoria</label>
+        <input id="categoria" type="text" maxlength="30" list="categorias" placeholder="Ex.: Lanches" autocomplete="off">
+        <datalist id="categorias"></datalist>
+
+        <div class="linha">
+          <div>
+            <label for="quantidade">Quantidade</label>
+            <input id="quantidade" type="number" min="0" step="1" placeholder="0">
+          </div>
+          <div>
+            <label for="preco">Preço (R$)</label>
+            <input id="preco" type="number" min="0" step="0.01" placeholder="0,00">
+          </div>
+        </div>
+
+        <label for="descricao">Descrição <small>(opcional)</small></label>
+        <textarea id="descricao" rows="3" maxlength="200"></textarea>
+
+        <p class="erro" id="erro" role="alert"></p>
+
+        <div class="acoes-form">
+          <button type="submit" class="botao" id="btn-salvar">Adicionar produto</button>
+          <button type="button" class="botao-secundario" id="btn-cancelar" hidden>Cancelar</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ===== LISTA (Read) ===== -->
+    <section class="painel-lista">
+      <header class="topo-lista">
+        <div>
+          <h2>Produtos cadastrados</h2>
+          <p class="subtitulo" id="contador"></p>
+        </div>
+        <input id="busca" type="search" placeholder="Buscar por nome, código ou categoria" aria-label="Buscar produtos">
+      </header>
+
+      <div class="tabela-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th><th>Produto</th><th>Categoria</th>
+              <th class="num">Qtd</th><th class="num">Preço</th><th class="acoes-col">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="corpo"></tbody>
+        </table>
+        <div class="vazio" id="vazio" hidden></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== CONFIRMAÇÃO (Delete) ===== -->
+  <div class="modal" id="modal" hidden>
+    <div class="modal-caixa" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+      <h2 id="modal-titulo">Excluir produto?</h2>
+      <p id="modal-texto"></p>
+      <div class="modal-acoes">
+        <button type="button" class="botao-secundario" id="btn-nao">Cancelar</button>
+        <button type="button" class="botao-perigo" id="btn-sim">Excluir</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* Os produtos ficam salvos no banco de dados, através da API Spring Boot. */
+    const API = "http://localhost:8080/produtos"; // ajuste se sua API usar outra porta/endereço
+    const $ = (id) => document.getElementById(id);
+
+    let produtos = [];
+    let editandoId = null;   // sempre string
+    let excluindoId = null;  // sempre string
+
+    /* ---------- comunicação com a API ---------- */
+    async function api(caminho = "", opcoes = {}) {
+      let resposta;
+      try {
+        resposta = await fetch(API + caminho, {
+          headers: { "Content-Type": "application/json" },
+          ...opcoes
+        });
+      } catch (e) {
+        throw new Error("Não foi possível conectar ao servidor. Verifique se a API está rodando.");
+      }
+      if (resposta.status === 204) return null;
+      const corpo = await resposta.json().catch(() => null);
+      if (!resposta.ok) throw new Error((corpo && corpo.erro) || "Erro inesperado (" + resposta.status + ").");
+      return corpo;
+    }
+
+    async function carregar() {
+      try {
+        const lista = await api();
+        produtos = lista.map((p) => ({ ...p, id: String(p.id) }));
+      } catch (e) {
+        produtos = [];
+        toast(e.message);
+      }
+      render();
+    }
+
+    function escapar(t) {
+      return String(t ?? "").replace(/[&<>"']/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+    const moeda = (n) => Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+    let tempoToast;
+    function toast(msg) {
+      let t = $("toast");
+      if (!t) { t = document.createElement("div"); t.id = "toast"; t.className = "toast"; document.body.appendChild(t); }
+      t.textContent = msg;
+      requestAnimationFrame(() => t.classList.add("mostrar"));
+      clearTimeout(tempoToast);
+      tempoToast = setTimeout(() => t.classList.remove("mostrar"), 2800);
+    }
+
+    /* ---------- validação (o servidor valida de novo) ---------- */
+    function lerFormulario() {
+      const q = $("quantidade").value, p = $("preco").value;
+      return {
+        codigo: $("codigo").value.trim(),
+        nome: $("nome").value.trim(),
+        categoria: $("categoria").value.trim(),
+        quantidade: q === "" ? NaN : Number(q),
+        preco: p === "" ? NaN : Number(p),
+        descricao: $("descricao").value.trim()
+      };
+    }
+
+    function validar(d) {
+      if (!d.codigo) return ["codigo", "Informe o código do produto."];
+      if (!d.nome) return ["nome", "Informe o nome do produto."];
+      if (!d.categoria) return ["categoria", "Informe a categoria."];
+      if (!Number.isInteger(d.quantidade) || d.quantidade < 0)
+        return ["quantidade", "A quantidade deve ser um número inteiro, 0 ou mais."];
+      if (!(d.preco > 0)) return ["preco", "Informe um preço maior que zero."];
+      const repetido = produtos.some((p) => p.id !== editandoId && p.codigo.toLowerCase() === d.codigo.toLowerCase());
+      if (repetido) return ["codigo", "Já existe um produto com esse código."];
+      return null;
+    }
+
+    function limparErro() {
+      $("erro").textContent = "";
+      document.querySelectorAll("[aria-invalid]").forEach((i) => i.removeAttribute("aria-invalid"));
+    }
+
+    /* ---------- CREATE / UPDATE ---------- */
+    $("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      limparErro();
+      const dados = lerFormulario();
+      const problema = validar(dados);
+      if (problema) {
+        $("erro").textContent = problema[1];
+        $(problema[0]).setAttribute("aria-invalid", "true");
+        $(problema[0]).focus();
+        return;
+      }
+
+      const botao = $("btn-salvar");
+      botao.disabled = true;
+      try {
+        if (editandoId) {
+          await api("/" + editandoId, { method: "PUT", body: JSON.stringify(dados) });
+          toast("Produto atualizado.");
+        } else {
+          await api("", { method: "POST", body: JSON.stringify(dados) });
+          toast("Produto adicionado.");
+        }
+        sairDaEdicao();
+        await carregar();
+      } catch (err) {
+        $("erro").textContent = err.message;
+      } finally {
+        botao.disabled = false;
+      }
+    });
+
+    function iniciarEdicao(id) {
+      const p = produtos.find((x) => x.id === id);
+      if (!p) return;
+      editandoId = id;
+      limparErro();
+      $("codigo").value = p.codigo;
+      $("nome").value = p.nome;
+      $("categoria").value = p.categoria;
+      $("quantidade").value = p.quantidade;
+      $("preco").value = p.preco;
+      $("descricao").value = p.descricao || "";
+      $("titulo-form").firstChild.textContent = "Editar produto";
+      $("subtitulo-form").textContent = "Altere os dados e salve as alterações.";
+      $("btn-salvar").textContent = "Salvar alterações";
+      $("btn-cancelar").hidden = false;
+      $("nome").focus();
+      render();
+    }
+
+    function sairDaEdicao() {
+      editandoId = null;
+      $("form").reset();
+      limparErro();
+      $("titulo-form").firstChild.textContent = "Novo produto";
+      $("subtitulo-form").textContent = "Preencha e salve: o produto aparece na lista ao lado.";
+      $("btn-salvar").textContent = "Adicionar produto";
+      $("btn-cancelar").hidden = true;
+    }
+    $("btn-cancelar").addEventListener("click", () => { sairDaEdicao(); render(); });
+
+    /* ---------- READ (lista + busca) ---------- */
+    function render() {
+      const termo = $("busca").value.trim().toLowerCase();
+      const filtrados = produtos.filter((p) =>
+        !termo || [p.codigo, p.nome, p.categoria].some((v) => String(v).toLowerCase().includes(termo)));
+
+      $("contador").textContent = produtos.length === 1 ? "1 produto" : produtos.length + " produtos";
+      if (termo) $("contador").textContent += " · " + filtrados.length + " encontrado(s)";
+
+      $("corpo").innerHTML = filtrados.map((p) => `
+        <tr class="${p.id === editandoId ? "editando" : ""}">
+          <td>${escapar(p.codigo)}</td>
+          <td><strong>${escapar(p.nome)}</strong>${p.descricao ? `<small>${escapar(p.descricao)}</small>` : ""}</td>
+          <td><span class="tag">${escapar(p.categoria)}</span></td>
+          <td class="num"><span class="${p.quantidade <= 5 ? "qtd baixa" : "qtd"}">${p.quantidade}</span></td>
+          <td class="num">${moeda(p.preco)}</td>
+          <td class="acoes-col">
+            <button type="button" class="btn-acao" data-editar="${escapar(p.id)}">Editar</button>
+            <button type="button" class="btn-acao perigo" data-excluir="${escapar(p.id)}">Excluir</button>
+          </td>
+        </tr>`).join("");
+
+      const vazio = $("vazio");
+      vazio.hidden = filtrados.length > 0;
+      if (!filtrados.length) {
+        vazio.textContent = produtos.length
+          ? "Nenhum produto encontrado para essa busca."
+          : "Nenhum produto cadastrado ainda. Use o formulário ao lado para adicionar o primeiro.";
+      }
+
+      const cats = [...new Set(produtos.map((p) => p.categoria))].sort();
+      $("categorias").innerHTML = cats.map((c) => `<option value="${escapar(c)}">`).join("");
+    }
+
+    $("busca").addEventListener("input", render);
+
+    $("corpo").addEventListener("click", (e) => {
+      const ed = e.target.closest("[data-editar]");
+      const ex = e.target.closest("[data-excluir]");
+      if (ed) iniciarEdicao(ed.dataset.editar);
+      if (ex) pedirExclusao(ex.dataset.excluir);
+    });
+
+    /* ---------- DELETE (com confirmação) ---------- */
+    function pedirExclusao(id) {
+      const p = produtos.find((x) => x.id === id);
+      if (!p) return;
+      excluindoId = id;
+      $("modal-texto").textContent = `"${p.nome}" (código ${p.codigo}) será removido. Essa ação não pode ser desfeita.`;
+      $("modal").hidden = false;
+      $("btn-nao").focus();
+    }
+    function fecharModal() { excluindoId = null; $("modal").hidden = true; }
+
+    $("btn-nao").addEventListener("click", fecharModal);
+    $("modal").addEventListener("click", (e) => { if (e.target === $("modal")) fecharModal(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharModal(); });
+
+    $("btn-sim").addEventListener("click", async () => {
+      if (excluindoId === null) return;
+      const id = excluindoId;
+      try {
+        await api("/" + id, { method: "DELETE" });
+        if (id === editandoId) sairDaEdicao();
+        fecharModal();
+        await carregar();
+        toast("Produto excluído.");
+      } catch (err) {
+        fecharModal();
+        toast(err.message);
+      }
+    });
+
+    carregar();
+  </script>
+</body>
+</html>
